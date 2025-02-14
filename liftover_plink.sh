@@ -13,8 +13,6 @@ fi
 # directions here: https://crossmap.readthedocs.io/en/latest/#installation
 # Chain files and helper code files should be in same directory as this script.
 
-#TODO: change .py before sharing!
-
 # STILL TODO:
 # make conda environment and recipe for this?
 # implement liftover hg19 to hg38
@@ -39,7 +37,7 @@ paste ${out_dir}/tmp_c1.txt \
     > ${out_dir}/tmp_in.bed
 
 # Do crossover
-CrossMap.py bed hg38ToHg19.over.chain \
+CrossMap bed hg38ToHg19.over.chain \
    ${out_dir}/tmp_in.bed  \
    ${out_dir}/tmp_out.bed
 
