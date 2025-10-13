@@ -3,7 +3,7 @@
 # Set arguments
 if [ "$#" -eq  "0" ]
 then
-   echo "Usage: ${0##*/} <input_format> <input_file> <out_dir>"
+   echo "Usage: ${0##*/} <input_file> <out_dir>"
    exit
 fi
 
