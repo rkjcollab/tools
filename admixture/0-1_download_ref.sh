@@ -1,8 +1,9 @@
-
+#!/bin/bash
 
 # SDS modifying from SER's pipeline in ancestry_estimation.qmd.
-# Step 1 of Admixture for ancestry estimation.
-# NOTE: this script only needs to be run once.
+# Step 0-1 of Admixture for ancestry estimation.
+# NOTE: this script is step 0 as it only needs to be run once and then its results
+# can be used across projects/studies.
 
 # First we need to download the 1000 genomes genetic data and the demographic data.
 # The genetic data is downloaded by chromosome.
