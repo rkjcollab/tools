@@ -18,7 +18,8 @@ while getopts r:m:o: opt; do
    case "${opt}" in
       r) REF_PATH=${OPTARG};;  # path to chr1 ref
       m) MASK_PATH=${OPTARG};;  # path to 1000G mask
-      o) OUT=${OPTARG};;  # path to out dir
+      o) OUT=${OPTARG};;  # path to out dir, Immunogenetics_T1D/genetics/teddy_r01/1000genomesPCA
+        # new out dir Immunogenetics_T1D/genetics/teddy_r01/admixture, make subfolders normalize_1000g, qc_1000g
       \?) echo "Invalid option -$OPTARG" >&2
       exit 1;;
    esac
@@ -76,11 +77,13 @@ do
   # Step 2: LD prune & extract to well recognized snps
   plink \
     --bfile ${TMP}/1000G.chr${chr}.qc \
+    --keep-allele-order \
     --make-set "$MASK_PATH" \
     --write-set \
     --out ${TMP}/strict_set
   plink \
     --bfile ${TMP}/1000G.chr${chr}.qc \
+    --keep-allele-order \
     --extract ${TMP}/strict_set.set \
     --indep-pairwise 50 5 0.2 \
     --out ${TMP}/1000G.chr${chr}.prune
@@ -88,13 +91,8 @@ do
   # Step 3: Extract pruned SNPs
   plink \
     --bfile ${TMP}/1000G.chr${chr}.qc \
+    --keep-allele-order \
     --extract ${TMP}/1000G.chr${chr}.prune.prune.in \
     --make-bed \
     --out ${OUT}/qc/1000G.chr${chr}.qc.pruned
-  # Also write out version with chr:pos:ref:alt varIDs
-  plink2 \
-    --bfile ${OUT}/qc/1000G.chr${chr}.qc.pruned \
-    --set-all-var-ids @:#:\$r:\$a --new-id-max-allele-len 999 \
-    --make-bed \
-    --out ${OUT}/qc/1000G.chr${chr}.qc.pruned.chrpos
 done

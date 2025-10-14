@@ -1,0 +1,61 @@
+---
+title: "run_admixture.Rmd"
+author: "SDS"
+date: "Last compiled on `r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: kable
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(
+  root.dir =
+    "/Users/slacksa/OneDrive - The University of Colorado Denver/Immunogenetics_T1D")
+
+library(tidyverse)
+library(conflicted)
+
+```
+
+# **Overview**
+
+RMarkdown runs Admixture using 1000G as reference. This report is not intended
+to be knit - just to be run chunk by chunk.ß
+
+Requires PLINK1.9 and PLINK2.
+
+
+# **Run Admixture**
+
+Skipping scripts 0-1 and 0-2 - already run by Shane in ancestry_estimation.qmd.
+
+### Step 1-1
+
+```{zsh engine.opts='-i', eval = F}
+mamba activate bcftools-vcftools-osx64-crossmap
+code_dir="/Users/slacksa/repos/tools/admixture"
+RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
+
+bash "$code_dir"/1-1_get_comm_variants.sh \
+  -r ${RKJCOLLAB}/Immunogenetics_T1D/genetics/teddy_r01/1000genomesPCA/qc/1000G.chr1.qc.pruned \
+  -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/daisyask_exome_array/clean/daisyexome \
+  -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture
+
+```
+
+
+
+
+
+
+# **Session Info**
+
+R Session info:
+
+```{r session_info}
+sessionInfo()
+```
