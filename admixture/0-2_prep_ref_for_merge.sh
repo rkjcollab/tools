@@ -35,8 +35,7 @@ trap 'rm -rf "$TMP"' EXIT
 echo "Step1: Normalize VCF"
 echo "------------------------------"
 
-# split multiallelics then subset to just biallelic SNPs then rm duplicates and output
-# create index file for fast access after
+# split multiallelics then subset to just biallelic SNPs then rm duplicates
 for chr in $(seq 1 22)
 do
   echo "Processing chr${chr}..."

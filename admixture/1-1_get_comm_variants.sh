@@ -5,9 +5,6 @@
 
 # Now we find variants that are common between TEDDY exome and 1000 Genomes & Merge.
 
-set -e
-set -u
-
 while getopts r:s:o: opt; do
    case "${opt}" in
       r) REF_PATH=${OPTARG};;  # path to chr1 ref after 0-2, ${OUT}/qc/1000G.chr${chr}.qc.pruned
@@ -21,54 +18,61 @@ done
 
 # Find common variants between TEDDY and 1000 Genomes & Merge, matching
 # by "chr:pos" IDs
-# RAW="/Users/ridouxs/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Immunogenetics_T1D/raw"
 
 # Get/make paths
 mkdir -p ${OUT}/study_1000G
 TMP=$(mktemp -d -p "$OUT")
 trap 'rm -rf "$TMP"' EXIT
 
-# # Write out snplists for each reference chromosome
-# for chr in $(seq 1 22)
-# do
-#     ref_chr_path="${REF_PATH/chr1/chr$chr}"
-#     ref_chr_path_chrpos="${REF_PATH/chr1/chr$chr}.chrpos"
-#     # First, write out version with chr:pos:ref:alt varIDs
-#     plink2 \
-#         --bfile "$ref_chr_path" \
-#         --set-all-var-ids @:# --new-id-max-allele-len 999 \
-#         --make-bed \
-#         --out "$ref_chr_path_chrpos"
-# 	plink \
-# 		--bfile "$ref_chr_path_chrpos" \
-#         --keep-allele-order \
-# 		--write-snplist \
-# 		--out ${TMP}/1000G.chr${chr}
-# done
+# Write out snplists for each reference chromosome
+for chr in $(seq 1 22)
+do
+    ref_chr_path="${REF_PATH/chr1/chr$chr}"
+    ref_chr_path_chrpos="${REF_PATH/chr1/chr$chr}.chrpos"
+    # First, write out version with chr:pos:ref:alt varIDs
+    plink2 \
+        --bfile "$ref_chr_path" \
+        --set-all-var-ids @:# --new-id-max-allele-len 999 \
+        --make-bed \
+        --out "$ref_chr_path_chrpos"
+	plink \
+		--bfile "$ref_chr_path_chrpos" \
+        --keep-allele-order \
+		--write-snplist \
+		--out ${TMP}/1000G.chr${chr}
+done
 
-# # Merge reference snplists
-# cat ${TMP}/1000G.chr*.snplist | sort | uniq > ${OUT}/study_1000G/1000G.snplist
+# Merge reference snplists
+cat ${TMP}/1000G.chr*.snplist | sort | uniq > ${OUT}/study_1000G/1000G.snplist
 
-# Write out snplist from study
-#TODO: may have to split this into two commands!
+# Remove SNPs with duplicate positions and allele codes, keep only
+# autosomes in analysis
+plink \
+    --bfile ${STUDY_PATH} \
+    --keep-allele-order \
+    --autosome \
+    --list-duplicate-vars suppress-first ids-only \
+    --out ${TMP}/tmp_dupl_check
+plink \
+    --bfile ${STUDY_PATH} \
+    --keep-allele-order \
+    --exclude ${TMP}/tmp_dupl_check.dupvar \
+    --autosome \
+    --make-bed --out ${OUT}/study_1000G/study.nodupl
 
-
-
-
-#TODO: restart here - need different strategy... maybe merge by chr:pos:ref:alt,
-# then for chr:pos for those that don't merge, then ???
-
-
-
-
+# Then update to chrpos IDs, keep only one SNP at each position
+# (arbitrarily keep first), and write out snplist
+#TODO: revisit and see if way to optimize this?
 plink2 \
-	--bfile ${STUDY_PATH} \
+	--bfile ${OUT}/study_1000G/study.nodupl \
     --set-all-var-ids @:# --new-id-max-allele-len 999 \
-	--write-snplist  \
-	--out ${OUT}/study_1000G/study
+    --rm-dup force-first \
+    --write-snplist \
+    --make-bed \
+	--out ${OUT}/study_1000G/study.nodupl.chrpos.snps
 
 # Find common SNPs between reference and study
-sort ${OUT}/study_1000G/study.snplist > ${TMP}/study_snps.sorted.txt
+sort ${OUT}/study_1000G/study.nodupl.chrpos.snps.snplist > ${TMP}/study_snps.sorted.txt
 sort ${OUT}/study_1000G/1000G.snplist > ${TMP}/1000G_snps.sorted.txt
 comm -12 ${TMP}/study_snps.sorted.txt ${TMP}/1000G_snps.sorted.txt > ${OUT}/study_1000G/common_snps.txt
 
@@ -94,7 +98,10 @@ plink \
 	--write-snplist \
 	--out ${TMP}/1000G_all_chrs_tmp
 
-# If any exclude SNPs that failed merge
+# If any, exclude SNPs that failed merge
+#TODO: in SDS testing, these seem to be multi-allelic. Do we want to revisit
+# this decision?
+# TO NOTE: as is, can't run script to fail on error because would get stuck here
 if [ -e "${TMP}/1000G_all_chrs_tmp-merge.missnp" ]
 then
     for chr in $(seq 1 22)
@@ -124,9 +131,9 @@ else
 fi
 
 ### Extract only common study SNPs
-# Prepare TEDDY data with only common snps
+# Prepare study data with only common snps
 plink \
-	--bfile ${STUDY_PATH} \
+	--bfile ${OUT}/study_1000G/study.nodupl.chrpos.snps \
     --keep-allele-order \
 	--extract ${OUT}/study_1000G/1000G_all_chrs.snplist \
 	--make-bed \

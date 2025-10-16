@@ -3,10 +3,6 @@
 # SDS modifying from SER's pipeline in ancestry_estimation.qmd.
 # Step 1-3 of Admixture for ancestry estimation.
 
-
-set -e
-set -u
-
 while getopts o: opt; do
    case "${opt}" in
       o) OUT=${OPTARG};;  # path to out dir, Immunogenetics_T1D/genetics/teddy_r01/ancestry_estimation
@@ -35,40 +31,22 @@ plink \
     --make-bed \
     --out ${OUT}/ancestry_estimation/study_1000G_pruned_maf0.1
 
-# Make 1000G ref bed
+# Make 1000G ref file
 plink \
-    --bfile ${OUT}/study_1000G_pruned_maf0.1 \
+    --bfile ${OUT}/ancestry_estimation/study_1000G_pruned_maf0.1 \
     --keep ${OUT}/study_1000G/1000G_samples.txt \
     --make-bed \
     --nonfounders \
     --keep-allele-order \
-    --out ${OUT}/1000G_ref
+    --out ${OUT}/ancestry_estimation/1000G_ref
       
-# Make teddy bed
+# Make study file
 plink \
-    --bfile ${OUT}/study_1000G_merged_pruned_maf0.1 \
+    --bfile ${OUT}/ancestry_estimation/study_1000G_pruned_maf0.1 \
     --keep ${OUT}/study_1000G/study_samples.txt \
     --make-bed \
     --nonfounders \
     --keep-allele-order \
-    --out ${OUT}/study
-
-# make 1000G ref bed
-plink --bfile ${OUT}/teddy_1000G_merged_pruned_maf1 \
-      --keep ${OUT}/1000G_samples.txt \
-      --exclude ${OUT}/TEDDY_allmissing.txt \
-      --make-bed \
-      --nonfounders \
-      --keep-allele-order \
-      --out ${OUT}/1000G_ref
-      
-# make teddy bed
-plink --bfile ${OUT}/teddy_1000G_merged_pruned_maf1 \
-      --keep ${OUT}/TEDDY_samples.txt \
-      --exclude ${OUT}/TEDDY_allmissing.txt \
-      --make-bed \
-      --nonfounders \
-      --keep-allele-order \
-      --out ${OUT}/TEDDY_study
+    --out ${OUT}/ancestry_estimation/study
 
 #TODO: may need to check completely missing SNPs here or above!

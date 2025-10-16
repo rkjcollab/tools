@@ -9,9 +9,6 @@
 # follow Michelle Daya's pipeline, modified by SDS:
     # https://github.com/sdslack/merge_genetic_data/blob/master/merge_data_sets.sh
 
-set -e
-set -u
-
 while getopts o: opt; do
    case "${opt}" in
       o) OUT=${OPTARG};;  # path to out dir, Immunogenetics_T1D/genetics/teddy_r01/1000genomesPCA
@@ -35,7 +32,7 @@ plink \
    --out ${OUT}/study_1000G/study_mergecheck
       
 # If any, flip SNPs
-if [ -e "${out_dir}/${study1_plink_prefix}_${study2_plink_prefix}_merged1-merge.missnp" ]
+if [ -e "${OUT}/study_1000G/study_mergecheck.missnp" ]
 then
     plink \
         --bfile ${OUT}/study_1000G/study.common \
@@ -77,13 +74,15 @@ else
 fi
 
 # Merge
+awk '{print $2}' ${OUT}/study_1000G/study.common.cleaned.bim > ${TMP}/common_snp_list.txt
 plink \
-   --bfile ${OUT}/study_1000G/TEDDY.common.cleaned \
+   --bfile ${OUT}/study_1000G/study.common.cleaned \
    --keep-allele-order \
    --bmerge ${OUT}/study_1000G/1000G_all_chrs \
    --make-bed \
+   --extract ${TMP}/common_snp_list.txt \
    --out ${OUT}/study_1000G/study_1000G_merged
 
-# Get sample IDs for TEDDY and 1000G
+# Get sample IDs for study and 1000G
 awk '{print $1, $2}' ${OUT}/study_1000G/study.common.cleaned.fam > ${OUT}/study_1000G/study_samples.txt
 awk '{print $1, $2}' ${OUT}/study_1000G/1000G_all_chrs.fam > ${OUT}/study_1000G/1000G_samples.txt
