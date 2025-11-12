@@ -14,8 +14,11 @@ while getopts o:k: opt; do
    esac
 done
 
-# Run unsupervised ADMIXTURE with K selected from 2-1
-admixture ${OUT}/ancestry_estimation/1000G_ref.bed ${K}
+# Set wd so admixture output goes to right spot
+cd ${OUT}/ancestry_estimation
+
+# # Run unsupervised ADMIXTURE with K selected from 2-1
+# admixture ${OUT}/ancestry_estimation/1000G_ref.bed ${K}
 
 # Use learned allele frequencies as (fixed) input to next step
 cp ${OUT}/ancestry_estimation/1000G_ref.${K}.P ${OUT}/ancestry_estimation/study.${K}.P.in

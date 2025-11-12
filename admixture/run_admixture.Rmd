@@ -14,10 +14,11 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(
   root.dir =
-    "/Users/slacksa/OneDrive - The University of Colorado Denver/Immunogenetics_T1D")
+    "/Users/slacksa/OneDrive - The University of Colorado Denver")
 
 library(tidyverse)
 library(conflicted)
+library(data.table)
 
 ```
 
@@ -36,6 +37,8 @@ Requires PLINK1.9, PLINK2, bcftools, and ADMIXTURE.
 Skipping scripts 0-1 and 0-2 - already run by Shane in ancestry_estimation.qmd.
 
 ### Step 1-1
+
+*TODO: does it make sense to use raw exome chip, not QCed one?*
 
 ```{zsh engine.opts='-i', eval = F}
 mamba activate bcftools
@@ -116,6 +119,150 @@ bash "$code_dir"/2-2_admixture.sh \
   -k 5
 
 ```
+
+### Plot - TEMP
+
+*TODO: move this to report?*
+
+```{r}
+
+# plot the Q estimates from ADMIXTURE for the 1000G reference
+Q.1000 <- as.data.frame(
+  fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.5.Q"))
+
+colnames(Q.1000) <- paste0("Ancestry", 1:ncol(Q.1000))
+
+demo.1000g <- fread("Immunogenetics_T1D/raw/genetic_maps/1000genomes-phase3/integrated_call_samples_v3.20130502.ALL.panel") %>% 
+  dplyr::select(-V5, -V6)
+
+fam.1000g <- fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.fam") %>% 
+  rename(FID = V1,
+         IID = V2) %>% 
+  left_join(demo.1000g, by = c("IID"="sample")) %>% 
+  select("IID","super_pop")
+
+Q.1000$IID <- fam.1000g$IID
+Q.1000$pop <- fam.1000g$super_pop
+
+Q.1000 <- Q.1000 %>% arrange(pop)
+Q.1000$Individual <- factor(Q.1000$IID, levels = Q.1000$IID)
+
+Q.1000_long <- Q.1000 %>%
+  pivot_longer(
+    cols = starts_with("Ancestry"),
+    names_to = "AncestryComponent",
+    values_to = "Proportion"
+  )
+
+# Compute midpoint positions for population labels
+pop_positions <- Q.1000 %>%
+  group_by(pop) %>%
+  summarize(mid = mean(as.numeric(Individual)))
+
+colors <- RColorBrewer::brewer.pal(n = 8, name = "Set2")[1:5]
+
+# Plot stacked barplot with population labels
+ggplot(Q.1000_long, aes(x = Individual, y = Proportion, fill = AncestryComponent)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(x = "Population",
+       y = "Ancestry",
+       title = "1000 Genomes Reference") +
+  geom_text(
+    data = pop_positions,
+    aes(x = mid, y = -0.05, label = pop),
+    inherit.aes = FALSE
+  )
+
+Q.1000_long %>% 
+  dplyr::filter(pop == "EUR") %>% 
+  group_by(AncestryComponent) %>% 
+  summarise(mean = mean(Proportion),
+            min = min(Proportion),
+            max = max(Proportion))
+# lets say if Ancestry1 > 0.80
+
+
+```
+
+
+```{r}
+# Plot the study estimates
+Q.study <- as.data.frame(
+  fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.5.Q"))
+
+colnames(Q.study) <- paste0("Ancestry", 1:ncol(Q.study))
+
+fam.study <- fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.fam") %>% 
+  rename(FID = V1,
+         IID = V2) %>% 
+  select(FID, IID)
+
+Q.study$IID <- fam.study$IID
+Q.study$pop <- ifelse(Q.study$Ancestry1 > 0.80, "EUR", "other")
+
+table(Q.study$pop)
+
+Q.study <- Q.study %>% arrange(pop)
+Q.study$Individual <- factor(Q.study$IID, levels = Q.study$IID)
+
+Q.study_long <- Q.study %>%
+  pivot_longer(
+    cols = starts_with("Ancestry"),
+    names_to = "AncestryComponent",
+    values_to = "Proportion"
+  )
+
+# Compute midpoint positions for population labels
+pop_positions <- Q.study %>%
+  group_by(pop) %>%
+  summarize(mid = mean(as.numeric(Individual)))
+
+colors <- RColorBrewer::brewer.pal(n = 8, name = "Set2")[1:5]
+
+# Plot stacked barplot with population labels
+ggplot(Q.study_long, aes(x = Individual, y = Proportion, fill = AncestryComponent)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(x = "Population",
+       y = "Ancestry",
+       title = "study Ancestries") +
+  geom_text(
+    data = pop_positions,
+    aes(x = mid, y = -0.05, label = pop),
+    inherit.aes = FALSE
+  ) + 
+  geom_hline(yintercept = 0.20)
+
+demo.study <- Q.study %>% 
+  left_join(fam.study, by = c("IID"= "IID")) %>% 
+  select(FID, IID, pop)
+```
+
+```{r}
+# Write out all populations results
+write_tsv(demo.study,
+          "DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study_pops.txt")
+
+# Write out list with > 80% EUR in DAISY
+demo.study.eur <- demo.study %>%
+  dplyr::filter(pop == "EUR")
+write_tsv(demo.study.eur,
+          "DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study_eur_list.txt")
+
+```
+
+
 
 # **Session Info**
 
