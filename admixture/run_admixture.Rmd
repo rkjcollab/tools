@@ -17,17 +17,19 @@ knitr::opts_knit$set(
     "/Users/slacksa/OneDrive - The University of Colorado Denver")
 
 library(tidyverse)
-library(conflicted)
-library(data.table)
 
 ```
 
 # **Overview**
 
 RMarkdown runs Admixture using 1000G as reference. This report is not intended
-to be knit - just to be run chunk by chunk.ß
+to be knit - just to be run chunk by chunk.
 
 Requires PLINK1.9, PLINK2, bcftools, and ADMIXTURE.
+
+TO NOTE: this report and many/all of the scripts it calls assume steps 0-1 and
+0-2 have been run as shown and using 1000G. If using another reference, will
+need to update/remove hardcoding in the helper scripts.
 
 
 # **Run Admixture**
@@ -38,16 +40,17 @@ Skipping scripts 0-1 and 0-2 - already run by Shane in ancestry_estimation.qmd.
 
 ### Step 1-1
 
-*TODO: does it make sense to use raw exome chip, not QCed one?*
+Use data after first step of pre-imputation QC in imputation repo. If final
+pre_qc file was lifted over, use file right before liftover - pre_qc_hwe.
 
 ```{zsh engine.opts='-i', eval = F}
 mamba activate bcftools
 code_dir="/Users/slacksa/repos/tools/admixture"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
 bash "$code_dir"/1-1_get_comm_variants.sh \
   -r ${RKJCOLLAB}/Immunogenetics_T1D/genetics/teddy_r01/1000genomesPCA/qc/1000G.chr1.qc.pruned \
-  -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/daisyask_exome_array/clean/daisyexome_study_ids \
+  -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/tm_r3_imp/full_qc/pre_qc/pre_qc_hwe \
+  -c "$code_dir" \
   -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture
 
 ```
@@ -55,15 +58,13 @@ bash "$code_dir"/1-1_get_comm_variants.sh \
 Note: multi-allelic warning at first merge (by-chr merge of reference) -
 for now, just removing these variants but could revisit in future.
 
-17827 overlapping variants for Admixture.
-
+17799 overlapping variants for admixture.
 
 ### Step 1-2
 
 ```{zsh engine.opts='-i', eval = F}
 mamba activate bcftools
 code_dir="/Users/slacksa/repos/tools/admixture"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
 bash "$code_dir"/1-2_merge.sh \
   -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture
@@ -71,7 +72,7 @@ bash "$code_dir"/1-2_merge.sh \
 ```
 
 
-17824 variants for admixture after flipping and excluding variants that coulnd't
+17797 variants for admixture after flipping and excluding variants that couldn't
 be flipped.
 
 ### Step 1-3
@@ -79,29 +80,27 @@ be flipped.
 ```{zsh engine.opts='-i', eval = F}
 mamba activate bcftools
 code_dir="/Users/slacksa/repos/tools/admixture"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
 bash "$code_dir"/1-3_prune.sh \
   -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture
 
 ```
 
-16489 variants after pruning.
+16561 variants after pruning.
 
 ### Step 2-1
 
 This step is slow and may be skipped if already done for reference population.
 Use the K selected by CV in step 2-2.
 
-SDS testing: K=1: 0.68715, K=2: 0.64285
+*Notes from SDS testing: K=1: 0.68715, K=2: 0.64285.*
 
 ```{zsh engine.opts='-i', eval = F}
-mamba activate bcftools
-code_dir="/Users/slacksa/repos/tools/admixture"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
-
-bash "$code_dir"/2-1_admixture_cv.sh \
-  -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture
+# mamba activate bcftools
+# code_dir="/Users/slacksa/repos/tools/admixture"
+# 
+# bash "$code_dir"/2-1_admixture_cv.sh \
+#   -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture
 
 ```
 
@@ -112,7 +111,6 @@ bash "$code_dir"/2-1_admixture_cv.sh \
 ```{zsh engine.opts='-i', eval = F}
 mamba activate bcftools
 code_dir="/Users/slacksa/repos/tools/admixture"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
 bash "$code_dir"/2-2_admixture.sh \
   -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture \
@@ -120,148 +118,25 @@ bash "$code_dir"/2-2_admixture.sh \
 
 ```
 
-### Plot - TEMP
+Note this step took about 30 minutes to run (with 1 thread for admixture).
 
-*TODO: move this to report?*
+### Step 2-3
 
-```{r}
+*TODO: this step has more explicit paths than other steps, but doesn't need too.*
+*Update to make consistent when revisit.*
 
-# plot the Q estimates from ADMIXTURE for the 1000G reference
-Q.1000 <- as.data.frame(
-  fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.5.Q"))
 
-colnames(Q.1000) <- paste0("Ancestry", 1:ncol(Q.1000))
+```{zsh engine.opts='-i', eval = F}
+code_dir="/Users/slacksa/repos/tools/admixture"
 
-demo.1000g <- fread("Immunogenetics_T1D/raw/genetic_maps/1000genomes-phase3/integrated_call_samples_v3.20130502.ALL.panel") %>% 
-  dplyr::select(-V5, -V6)
-
-fam.1000g <- fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.fam") %>% 
-  rename(FID = V1,
-         IID = V2) %>% 
-  left_join(demo.1000g, by = c("IID"="sample")) %>% 
-  select("IID","super_pop")
-
-Q.1000$IID <- fam.1000g$IID
-Q.1000$pop <- fam.1000g$super_pop
-
-Q.1000 <- Q.1000 %>% arrange(pop)
-Q.1000$Individual <- factor(Q.1000$IID, levels = Q.1000$IID)
-
-Q.1000_long <- Q.1000 %>%
-  pivot_longer(
-    cols = starts_with("Ancestry"),
-    names_to = "AncestryComponent",
-    values_to = "Proportion"
-  )
-
-# Compute midpoint positions for population labels
-pop_positions <- Q.1000 %>%
-  group_by(pop) %>%
-  summarize(mid = mean(as.numeric(Individual)))
-
-colors <- RColorBrewer::brewer.pal(n = 8, name = "Set2")[1:5]
-
-# Plot stacked barplot with population labels
-ggplot(Q.1000_long, aes(x = Individual, y = Proportion, fill = AncestryComponent)) +
-  geom_bar(stat = "identity", width = 1) +
-  scale_fill_manual(values = colors) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
-  ) +
-  labs(x = "Population",
-       y = "Ancestry",
-       title = "1000 Genomes Reference") +
-  geom_text(
-    data = pop_positions,
-    aes(x = mid, y = -0.05, label = pop),
-    inherit.aes = FALSE
-  )
-
-Q.1000_long %>% 
-  dplyr::filter(pop == "EUR") %>% 
-  group_by(AncestryComponent) %>% 
-  summarise(mean = mean(Proportion),
-            min = min(Proportion),
-            max = max(Proportion))
-# lets say if Ancestry1 > 0.80
-
+Rscript "$code_dir"/2-3_get_eur.R \
+  --q-ref ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.5.Q \
+  --demo-ref ${RKJCOLLAB}/Immunogenetics_T1D/raw/genetic_maps/1000genomes-phase3/integrated_call_samples_v3.20130502.ALL.panel \
+  --plink-ref ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref \
+  --q-study ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.5.Q \
+  --plink-study ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study
 
 ```
-
-
-```{r}
-# Plot the study estimates
-Q.study <- as.data.frame(
-  fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.5.Q"))
-
-colnames(Q.study) <- paste0("Ancestry", 1:ncol(Q.study))
-
-fam.study <- fread("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.fam") %>% 
-  rename(FID = V1,
-         IID = V2) %>% 
-  select(FID, IID)
-
-Q.study$IID <- fam.study$IID
-Q.study$pop <- ifelse(Q.study$Ancestry1 > 0.80, "EUR", "other")
-
-table(Q.study$pop)
-
-Q.study <- Q.study %>% arrange(pop)
-Q.study$Individual <- factor(Q.study$IID, levels = Q.study$IID)
-
-Q.study_long <- Q.study %>%
-  pivot_longer(
-    cols = starts_with("Ancestry"),
-    names_to = "AncestryComponent",
-    values_to = "Proportion"
-  )
-
-# Compute midpoint positions for population labels
-pop_positions <- Q.study %>%
-  group_by(pop) %>%
-  summarize(mid = mean(as.numeric(Individual)))
-
-colors <- RColorBrewer::brewer.pal(n = 8, name = "Set2")[1:5]
-
-# Plot stacked barplot with population labels
-ggplot(Q.study_long, aes(x = Individual, y = Proportion, fill = AncestryComponent)) +
-  geom_bar(stat = "identity", width = 1) +
-  scale_fill_manual(values = colors) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
-  ) +
-  labs(x = "Population",
-       y = "Ancestry",
-       title = "study Ancestries") +
-  geom_text(
-    data = pop_positions,
-    aes(x = mid, y = -0.05, label = pop),
-    inherit.aes = FALSE
-  ) + 
-  geom_hline(yintercept = 0.20)
-
-demo.study <- Q.study %>% 
-  left_join(fam.study, by = c("IID"= "IID")) %>% 
-  select(FID, IID, pop)
-```
-
-```{r}
-# Write out all populations results
-write_tsv(demo.study,
-          "DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study_pops.txt")
-
-# Write out list with > 80% EUR in DAISY
-demo.study.eur <- demo.study %>%
-  dplyr::filter(pop == "EUR")
-write_tsv(demo.study.eur,
-          "DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study_eur_list.txt")
-
-```
-
 
 
 # **Session Info**
