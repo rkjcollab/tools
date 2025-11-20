@@ -7,8 +7,7 @@
 
 while getopts o: opt; do
    case "${opt}" in
-      o) OUT=${OPTARG};;  # path to out dir, Immunogenetics_T1D/genetics/teddy_r01/ancestry_estimation
-        # new out dir Immunogenetics_T1D/genetics/teddy_r01/admixture, make subfolder ancestry_estimation
+      o) OUT=${OPTARG};;  # path to out dir
       \?) echo "Invalid option -$OPTARG" >&2
       exit 1;;
    esac
