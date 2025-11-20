@@ -5,12 +5,12 @@
 
 # Now we find variants that are common between TEDDY exome and 1000 Genomes & Merge.
 
-while getopts r:s:o: opt; do
+while getopts r:s:c:o: opt; do
    case "${opt}" in
       r) REF_PATH=${OPTARG};;  # path to chr1 ref after 0-2, ${OUT}/qc/1000G.chr${chr}.qc.pruned
       s) STUDY_PATH=${OPTARG};;  # path to study raw PLINK1.9 prefix
-      o) OUT=${OPTARG};;  # path to out dir, Immunogenetics_T1D/genetics/teddy_r01/1000genomesPCA
-        # new out dir Immunogenetics_T1D/genetics/teddy_r01/admixture, make subfolder study_1000g
+      c) CODE_DIR=${OPTARG};;  # path to tools/admixture code
+      o) OUT=${OPTARG};;  # path to out dir
       \?) echo "Invalid option -$OPTARG" >&2
       exit 1;;
    esac
@@ -20,6 +20,7 @@ done
 # by "chr:pos" IDs
 
 # Get/make paths
+rm -rf ${OUT}/study_1000G  # remove previous results if already present
 mkdir -p ${OUT}/study_1000G
 TMP=$(mktemp -d -p "$OUT")
 trap 'rm -rf "$TMP"' EXIT
@@ -45,24 +46,28 @@ done
 # Merge reference snplists
 cat ${TMP}/1000G.chr*.snplist | sort | uniq > ${OUT}/study_1000G/1000G.snplist
 
-# Remove SNPs with duplicate positions and allele codes, keep only
-# autosomes in analysis
-plink \
-    --bfile ${STUDY_PATH} \
-    --keep-allele-order \
+# Remove multiallelic, keep only autosomes in analysis
+plink2 --bfile ${STUDY_PATH} \
+    --max-alleles 2 \
     --autosome \
-    --list-duplicate-vars suppress-first ids-only \
-    --out ${TMP}/tmp_dupl_check
-plink \
-    --bfile ${STUDY_PATH} \
-    --keep-allele-order \
-    --exclude ${TMP}/tmp_dupl_check.dupvar \
-    --autosome \
-    --make-bed --out ${OUT}/study_1000G/study.nodupl
+    --make-bed --out ${TMP}/tmp_study_autosome
 
-# Then update to chrpos IDs, keep only one SNP at each position
-# (arbitrarily keep first), and write out snplist
-#TODO: revisit and see if way to optimize this?
+# First, if duplicate IDs have different missingness, remove the SNP with
+# more missingness.
+plink2 --bfile ${TMP}/tmp_study_autosome \
+   --missing --freq \
+   --make-pgen \
+   --out ${TMP}/tmp_study_dedup
+Rscript ${CODE_DIR}/dedup_miss.R \
+   -v ${TMP}/tmp_study_dedup.vmiss \
+   -p ${TMP}/tmp_study_dedup.pvar
+plink2 --bfile ${TMP}/tmp_study_autosome \
+   --make-bed \
+   --exclude ${TMP}/tmp_study_dedup_rm.txt \
+   --out ${OUT}/study_1000G/study.nodupl
+
+# Then, update all IDs to chr:pos:ref:alt and remove the remaining duplicates
+# by arbitrarily keeping first
 plink2 \
 	--bfile ${OUT}/study_1000G/study.nodupl \
     --set-all-var-ids @:# --new-id-max-allele-len 999 \
@@ -99,8 +104,8 @@ plink \
 	--out ${TMP}/1000G_all_chrs_tmp
 
 # If any, exclude SNPs that failed merge
-#TODO: in SDS testing, these seem to be multi-allelic. Do we want to revisit
-# this decision?
+#TODO: in SDS testing, these seem to be multi-allelic and in reference dataset.
+# Do we want to revisit this decision?
 # TO NOTE: as is, can't run script to fail on error because would get stuck here
 if [ -e "${TMP}/1000G_all_chrs_tmp-merge.missnp" ]
 then
