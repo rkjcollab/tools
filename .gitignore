@@ -47,3 +47,21 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Mac OS specific files
+*.DS_Store
+
+# Windows OS specific files
+
+# Data files
+*.csv
+*.Rdata
+*.RData
+*.rds
+*.xls*
+*.tsv
+
+# Images
+*.png
+*.jpg
+*.jpeg
