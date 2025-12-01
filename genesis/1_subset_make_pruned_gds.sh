@@ -7,11 +7,12 @@
 # SDS adding additional list subset option here
    #TODO: revisit and find better way to do this!
 
-while getopts s:e:i:o: opt; do
+while getopts s:e:i:m:o: opt; do
    case "${opt}" in
       s) STUDY_PATH=${OPTARG};;  # path to study QCed PLINK1.9 prefix
       e) EUR_ID_LIST=${OPTARG};;  # path to EUR ID list
       i) OTHER_ID_LIST=${OPTARG};;  # optional path to other ID filtering list
+      m) OTHER_ID_LIST_MODE=${OPTARG};;  # optional mode to "keep"/"remove"" other ID filtering list
       o) OUT=${OPTARG};;  # path to out dir
       \?) echo "Invalid option -$OPTARG" >&2
       exit 1;;
@@ -19,6 +20,7 @@ while getopts s:e:i:o: opt; do
 done
 
 # Get/make paths
+rm -rf ${OUT}  # remove previous results if already present
 mkdir -p ${OUT}
 code_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP=$(mktemp -d -p "$OUT")
@@ -33,9 +35,13 @@ plink --bfile ${STUDY_PATH} \
       --out ${TMP}/tmp_study_nhw
 
 if [ -n "${OTHER_ID_LIST}" ]; then
-   echo "Also filtering to other ID list only."
+   echo "Also filtering to other ID list only using mode ${mode}."
+   if [[ "${OTHER_ID_LIST_MODE}" != "keep" && "${OTHER_ID_LIST_MODE}" != "remove" ]]; then
+     echo "Error: OTHER_ID_LIST_MODE must be 'keep' or 'remove' when OTHER_ID_LIST is provided."
+     exit
+   fi
    plink --bfile ${TMP}/tmp_study_nhw \
-      --keep ${OTHER_ID_LIST} \
+      --${OTHER_ID_LIST_MODE} ${OTHER_ID_LIST} \
       --make-bed \
       --nonfounders \
       --keep-allele-order \
