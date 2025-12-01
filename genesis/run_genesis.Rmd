@@ -24,42 +24,33 @@ library(data.table)
 
 # **Overview**
 
-RMarkdown runs GENESIS, to be run after the Admixture pipeline. This report is
-not intended to be knit - just to be run chunk by chunk.
+This RMarkdown runs GENESIS, to be run after the Admixture pipeline. This report
+is not intended to be knit - just to be run chunk by chunk.
 
 Requires PLINK1.9, PLINK2, GENESIS (in R), SNPRelate (in R), KING.
-
 
 # **Run GENESIS**
 
 ### Step 1
 
-*TODO: for DAISY, just using exome chip QCed by UVA - do we need to update to*
-*Shane's pipeline?*
-
-*TODO: adding second list filtering option to subset to EUR and DAISY only here,*
-*revisit and find a better way!*
 
 ```{zsh engine.opts='-i', eval = F}
 mamba activate bcftools
 code_dir="/Users/slacksa/repos/tools/genesis"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
-bash "$code_dir"/1_subset_make_gds.sh \
-  -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/daisyask_exome_array/clean/daisyexome_study_ids \
+bash "$code_dir"/1_subset_make_pruned_gds.sh \
+  -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/tm_r3_imp/full_qc/pre_qc/pre_qc \
   -e ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study_eur_list.txt \
-  -i ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/final_plink_report_BDC/daisy_study_id_list.txt \
   -o ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/genesis
 
 ```
 
-Only have 366 of the 447 people in DAISY after EUR filter.
+XX variants and XX people after step 1.
 
 ### Step 2
 
 ```{zsh engine.opts='-i', eval = F}
 code_dir="/Users/slacksa/repos/tools/genesis"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
 bash "$code_dir"/2_king_pcair.sh \
   -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/genesis/study_nhw \
@@ -68,15 +59,16 @@ bash "$code_dir"/2_king_pcair.sh \
 
 ```
 
-299 unrelated, 67 related.
+XX completely unrelated (XX related), but XX considered unrelated after
+kinship threshold 0.0220970869120796 applied (GENESIS default, slightly stricter
+than third-degree relatives (first cousins)).
 
-Look at PC scree plot - think 2 PCs, although variance explained is VERY small.
+Look at PC scree plot - think XX PCs based on plot elbow.
 
 ### Step 3
 
 ```{zsh engine.opts='-i', eval = F}
 code_dir="/Users/slacksa/repos/tools/genesis"
-RKJCOLLAB="/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver"
 
 bash "$code_dir"/3_pcrelate_grm.sh \
   -s ${RKJCOLLAB}/DAISY/genetics/daisy_ask_genetics/genesis/study_nhw \
@@ -85,7 +77,8 @@ bash "$code_dir"/3_pcrelate_grm.sh \
 
 ```
 
-
+Run with XX PCs, XX samples without relatives, and no negative eigenvalues in
+the final GRM.
 
 # **Session Info**
 
