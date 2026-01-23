@@ -3,6 +3,7 @@
 Small tools/pipelines commonly used by the RKJcollab.
 
 ### **liftover**
+
 Pipeline to run liftover using CrossMap - in development. Currently can do hg38 to hg19 for PLINK1.9 or bed input.
 
 Examples:
@@ -17,6 +18,11 @@ bash liftover_bed.sh T1DGC_saige_EUR_id.txt 1 2 14 /Users/slacksa/support
 
 ### **admixture**
 
-Developed by Shane E. Ridoux.
+Initial version developed by Shane E. Ridoux.
 
-*TODO: add documentation/use instructions here!*
+*TODOs:*
+
++ add documentation/use instructions here
++ revisit and collapse 1-2 & 1-3
++ make more files TMP only
++ confirm MAF 0.1 at time LD prune merged input
