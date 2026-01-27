@@ -26,4 +26,4 @@ Initial version developed by Shane E. Ridoux.
 + revisit and collapse 1-2 & 1-3
 + make more files TMP only
 + confirm MAF 0.1 at time LD prune merged input
-+ remove study-only Admixture step & shorten final script
++ remove study-only Admixture step, shorten final script, & remove starting restriction to common variants?
