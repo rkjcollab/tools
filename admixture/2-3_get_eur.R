@@ -1,22 +1,27 @@
 #!/usr/bin/env Rscript
 
-library(argparse)
+# TO NOTE: this script uses genetic PCs and GMM method to estimate ancestral
+# populations in reference and study inputs. Although arguments are described
+# in context with Admixture inputs (since that step precedes this one), no
+# Admixture outputs are used in this script to determine ancestral populations.
+
+suppressPackageStartupMessages(library(argparse))
 suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(mclust))
 suppressPackageStartupMessages(library(plinkFile))
+suppressPackageStartupMessages(library(mclust))
 suppressPackageStartupMessages(library(pcaMethods))
 suppressPackageStartupMessages(library(plotly))
 
 parser <- ArgumentParser(
   description = paste0(
-    "Rscript cluster_eur.R run by run_admixture.Rmd. Note that the pipeline ",
+    "Rscript 2-3_get_eur.R run by run_admixture.Rmd. Note that the pipeline ",
     "is specific to using 1000G with K=5 as reference."))
 
 # Reference arguments
 parser$add_argument(
   "--ref", help=paste0(
-    "Prefix of PLINK file input to Admixture and .Q file from Admixture for ",
-    "reference (required)"), required=TRUE)
+    "Prefix of PLINK file input to Admixture for reference (required)"),
+    required=TRUE)
 parser$add_argument(
   "--demo-ref", help="Demographics file for reference (required)", required=TRUE)
 
@@ -30,6 +35,13 @@ args <- parser$parse_args()
 
 # Setup ------------------------------------------------------------------------
 
+# Set output prefix
+out_path <- dirname(args$study)
+
+# Load study files
+q_study <- read.table(paste0(args$study, ".5.Q"))
+fam_study <- read.table(paste0(args$study, ".fam"))
+
 # Load reference files
 q_ref <- read.table(paste0(args$ref, ".5.Q"))
 demo_ref <- read.table(args$demo_ref, header = T)
@@ -41,69 +53,10 @@ q_study <- read.table(paste0(args$study, ".5.Q"))
 fam_study <- read.table(paste0(args$study, ".fam"))
 bed_study <- readBED(paste0(args$study, ".bed"))
 
-# # TEMP DELETE
-# q_ref <- read.table("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.5.Q")
-# demo_ref <- read.table("Immunogenetics_T1D/raw/genetic_maps/1000genomes-phase3/integrated_call_samples_v3.20130502.ALL.panel", header = T)
-# fam_ref <- read.table("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.fam")
-# bed_ref <- readBED("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/1000G_ref.bed")
-# 
-# # Load study files
-# q_study <- read.table("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.5.Q")
-# fam_study <- read.table("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.fam")
-# bed_study <- readBED("DAISY/genetics/daisy_ask_genetics/admixture/ancestry_estimation/study.bed")
-# #####
-
-# Update column names
-colnames(q_study) <- paste0("Ancestry", 1:ncol(q_study))
-colnames(q_ref) <- paste0("Ancestry", 1:ncol(q_ref))
-
-# Update study and reference .fam files
-fam_ref <- fam_ref %>% 
-  rename(FID = V1,
-         IID = V2) %>% 
-  left_join(demo_ref, by = c("IID"="sample")) %>% 
+# Update reference demo file
+demo_ref <- demo_ref %>% 
+  rename(IID = sample) %>% 
   select("IID","super_pop")
-q_ref$IID <- fam_ref$IID
-q_ref$pop <- fam_ref$super_pop
-
-# Output prefix for plots that have to be written out as made
-out_path <- dirname(args$study)
-
-# Plot reference admixture -----------------------------------------------------
-
-# Factor by reference pop, order by decreasing Ancestry1
-q_ref <- q_ref %>%
-  arrange(pop) %>%
-  mutate(pop = factor(pop)) %>%
-  arrange(pop, desc(Ancestry1)) %>%
-  dplyr::mutate(id = row_number()) %>%
-  ungroup()
-
-# Then pivot longer
-q_ref_long <- q_ref %>%
-  pivot_longer(
-    cols = starts_with("Ancestry"),
-    names_to = "AncestryComponent",
-    values_to = "Proportion")
-
-# Plot stacked barplot with population labels
-anc_colors <- RColorBrewer::brewer.pal(n = 8, name = "Set2")[1:5]
-plot_ref_anc_bar <-
-  ggplot(q_ref_long, aes(x = id, y = Proportion, fill = AncestryComponent)) +
-  geom_bar(stat = "identity", width = 1) +
-  scale_fill_manual(values = anc_colors) +
-  theme_minimal() +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        strip.text = element_text(
-          angle = 90,
-          hjust = 0.5,
-          vjust = 0.5,
-          size = 10)) +
-  labs(x = "Population (from Reference)",
-       y = "Ancestry (by Admixture)",
-       title = "Reference Populations") +
-  facet_grid(~ pop, scales = "free_x", space = "free_x")
 
 # Use clustering to define EUR -------------------------------------------------
 
@@ -123,13 +76,16 @@ pca_study <- predict(pca_ref,
 # https://linkinghub.elsevier.com/retrieve/pii/S1877050920324686
 set.seed(123)
 X <- scores(pca_ref)[,1:4]
-gmm <- Mclust(data = X, G = 5)  # based on 1000G K=5
+gmm <- Mclust(data = X, G = 5)  # based on 1000G super-populations
 # summary(gmm)
 
 # Get summarized results of each reference ancestry group in each cluster
+result_indv <- data.frame(
+  classification = gmm$classification,
+  pop = demo_ref$super_pop[match(names(gmm$classification), demo_ref$IID)]) %>%
+  rownames_to_column("IID")
 result <- as.data.frame(
-  table(data.frame(classification = gmm$classification,
-                   pop = q_ref$pop[match(names(gmm$classification), q_ref$IID)])))
+  table(result_indv %>% dplyr::select(-IID)))
 
 # Use maximum ancestry group in each cluster to assign population
 map <- result %>%
@@ -149,66 +105,14 @@ study_ancestry$pop <- map$pop[
   match(study_ancestry$classification, map$classification)]
 # table(study_ancestry$pop)
 
-# Plot study results -----------------------------------------------------------
-
 # Add IDs
 fam_study <- fam_study %>% 
   rename(FID = V1, IID = V2) %>% 
   select(FID, IID)
-q_study$IID <- fam_study$IID  # admixture preserves order
-q_study$FID <- fam_study$FID
-q_study$pop <- study_ancestry$pop[match(q_study$IID, study_ancestry$IID)]
+fam_study$pop <- study_ancestry$pop[match(fam_study$IID, study_ancestry$IID)]
 
-# Factor by reference pop, order by decreasing Ancestry1
-q_study <- q_study %>%
-  arrange(pop) %>%
-  mutate(pop = factor(pop)) %>%
-  arrange(pop, desc(Ancestry1)) %>%
-  dplyr::mutate(id = row_number()) %>%
-  ungroup()
+# Plot population clusters -----------------------------------------------------
 
-# Then pivot longer
-q_study_long <- q_study %>%
-  pivot_longer(
-    cols = starts_with("Ancestry"),
-    names_to = "AncestryComponent",
-    values_to = "Proportion")
-
-# Plot stacked barplot with population labels
-plot_study_anc_bar <- ggplot(q_study_long, aes(x = id, y = Proportion, fill = AncestryComponent)) +
-  geom_bar(stat = "identity", width = 1) +
-  scale_fill_manual(values = anc_colors) +
-  theme_minimal() +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        strip.text = element_text(
-          angle = 90,
-          hjust = 0.5,
-          vjust = 0.5,
-          size = 10)) +
-  labs(x = "Population (by Clustering)",
-       y = "Ancestry (by Admixture)",
-       title = "Study Populations") +
-  facet_grid(~ pop, scales = "free_x", space = "free_x")
-
-plot_study_anc_bar_v2 <- ggplot(q_study_long, aes(x = id, y = Proportion, fill = AncestryComponent)) +
-  geom_bar(stat = "identity", width = 1) +
-  scale_fill_manual(values = anc_colors) +
-  theme_minimal() +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        strip.text = element_text(
-          angle = 90,
-          hjust = 0.5,
-          vjust = 0.5,
-          size = 10)) +
-  labs(x = "Population (by Clustering)",
-       y = "Ancestry (by Admixture)",
-       title = "Study Populations") +
-  facet_grid(~ pop, scales = "free_x")
-
-
-# Plot population clusters
 pcplot <- data.frame(
   PC1 = pca_study$scores[,1],
   PC2 = pca_study$scores[,2],
@@ -216,9 +120,11 @@ pcplot <- data.frame(
   group = study_ancestry$pop[match(rownames(pca_study$scores), study_ancestry$IID)])
 
 # 2D plot
-pop_colors <- RColorBrewer::brewer.pal(n = 8, name = "Set1")[1:5]
-names(pop_colors) <- unique(q_study$pop)
+pops <- sort(unique(pcplot$group))
+pop_colors <- RColorBrewer::brewer.pal(n = length(pops), name = "Set1")
+names(pop_colors) <- pops
 pcplot$color <- pop_colors[pcplot$group]
+
 png(paste0(out_path, "/study_proj_ref_pca_2d.png"), width = 1200, height = 900)
 plot(pcplot$PC1,
      pcplot$PC2,
@@ -251,28 +157,44 @@ plot_study_anc_pc <- plot_ly(
 
 # Write out --------------------------------------------------------------------
 
-# Write out plots not written out above
-ggsave(paste0(out_path, "/ref_admixture_bar.png"),
-       plot_ref_anc_bar, units = "in", width = 20, height = 10)
-ggsave(paste0(out_path, "/study_admixture_bar.png"),
-       plot_study_anc_bar, units = "in", width = 20, height = 10)
-ggsave(paste0(out_path, "/study_admixture_bar_even_scale.png"),
-       plot_study_anc_bar_v2, units = "in", width = 20, height = 10)
-htmlwidgets::saveWidget(
-  plot_study_anc_pc, paste0(out_path, "/study_proj_ref_pca_3d.html"))
+# Update variables for clarity after write out
+result_indv_exp <- result_indv %>%
+  dplyr::rename(pop_1000g = pop) %>%
+  dplyr::mutate(pop_gmm = map$pop[match(classification, map$classification)]) %>%
+  dplyr::select(-classification)
+fam_study_exp <- fam_study %>%
+  dplyr::rename(pop_gmm = pop)
 
-# Write out all populations results
+# Add admixture components
+colnames(q_study) <- paste0("Ancestry", 1:ncol(q_study))
+colnames(q_ref) <- paste0("Ancestry", 1:ncol(q_ref))
+q_ref$IID <- fam_ref$V2
+result_indv_exp <- result_indv_exp %>%
+  dplyr::left_join(., q_ref, by = c("IID"))
+
+q_study$IID <- fam_study$IID  # admixture preserves order
+fam_study_exp <- fam_study_exp %>%
+  dplyr::left_join(., q_study, by = c("IID"))
+
+# Write out 1000G super-population labels and assigned clusters
 write_tsv(
-  q_study %>%
-    dplyr::select(-id) %>%
-    dplyr::relocate(FID, IID),
-  paste0(out_path, "/study_pops.txt"))
+  result_indv_exp,
+  paste0(out_path, "/1000G_all_pop.txt"))
 
-# Write out list with > 80% EUR in DAISY
-q_study_eur <- q_study %>%
+# Write out assigned pop for all study individuals
+write_tsv(
+  fam_study_exp,
+  paste0(out_path, "/study_all_pop.txt"))
+
+# Write out list with EUR in study
+fam_study_eur <- fam_study %>%
   dplyr::filter(pop == "EUR") %>%
   dplyr::select(FID, IID)
 write_tsv(
-  q_study_eur,
+  fam_study_eur,
   paste0(out_path, "/study_eur_list.txt"),
   col_names = F)
+
+# Write out plots not written out above
+htmlwidgets::saveWidget(
+  plot_study_anc_pc, paste0(out_path, "/study_proj_ref_pca_3d.html"))
