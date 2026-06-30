@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Set arguments
-if [ "$#" -eq  "0" ]
+if [ "$#" -lt  "6" ]
 then
    echo "Usage: ${0##*/} <input_file> <chr_col_num> <pos_col_num>"
-   echo "       <id_col_num> <out_dir>"
+   echo "       <id_col_num> <out_dir> <target_build: hg19|hg38>"
    exit
 fi
 
-# Liftover from hg38 to hg19 with tab/space (txt, tsv) delimited file as input.
+# Liftover between hg19 and hg38 with tab/space (txt, tsv) delimited file as input.
 # Returns a file in simple bed format: columns chrom pos pos.
 
 # Script requires CrossMap v0.7.0 or higher. Can install based on
@@ -17,13 +17,24 @@ fi
 
 # STILL TODO:
 # make conda environment and recipe for this?
-# implement liftover hg19 to hg38
 
 input_file=$1  # path to and name of file with extension
 chr_col_num=$2
 pos_col_num=$3
 id_col_num=$4  # to allow for mapping back
 out_dir=$5
+target_build=$6
+
+if [ "$target_build" = "hg19" ]
+then
+   chain_file="hg38ToHg19.over.chain"
+elif [ "$target_build" = "hg38" ]
+then
+   chain_file="hg19ToHg38.over.chain"
+else
+   echo "Error: target_build must be hg19 or hg38"
+   exit 1
+fi
 
 # Get input_file without path and without extension
 input_file_no_path=$(basename "$input_file")
@@ -60,13 +71,13 @@ else
 fi
 
 # Do crossover
-CrossMap bed hg38ToHg19.over.chain \
+CrossMap bed $chain_file \
    ${out_dir}/${input_file_name}_bed.bed  \
-   ${out_dir}/${input_file_name}_bed_hg19.bed
+   ${out_dir}/${input_file_name}_bed_${target_build}.bed
 
 # Report SNP counts
 orig_snp_nr=`wc -l ${input_file}`
-crossover_snp_nr=`wc -l ${out_dir}/${input_file_name}_bed_hg19.bed`
+crossover_snp_nr=`wc -l ${out_dir}/${input_file_name}_bed_${target_build}.bed`
 
 echo "Original SNP nr: $orig_snp_nr"
 echo "Crossovered SNP nr: $crossover_snp_nr"
