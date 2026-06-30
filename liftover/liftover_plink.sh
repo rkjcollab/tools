@@ -1,25 +1,37 @@
 #!/bin/bash
 
 # Set arguments
-if [ "$#" -eq  "0" ]
+if [ "$#" -lt  "3" ]
 then
-   echo "Usage: ${0##*/} <input_file> <out_dir>"
+   echo "Usage: ${0##*/} <input_file> <out_dir> <target_build: hg19|hg38>"
    exit
 fi
 
-# Liftover from hg38 to hg19 with for PLINK1.9 files.
+# Liftover between hg19 and hg38 with for PLINK1.9 files.
 
 # Script requires PLINK2 and CrossMap v0.7.0 or higher. Can install based on
 # directions here: https://crossmap.readthedocs.io/en/latest/#installation
 # Chain files and helper code files should be in same directory as this script.
+# Currently needs to be run from liftover code directory.
 
 # STILL TODO:
 # make conda environment and recipe for this?
-# implement liftover hg19 to hg38
 # update to handle PLINK2 input as well
 
 input_file=$1  # path to and name PLINK1.9 .bim file
 out_dir=$2
+target_build=$3
+
+if [ "$target_build" = "hg19" ]
+then
+   chain_file="hg38ToHg19.over.chain"
+elif [ "$target_build" = "hg38" ]
+then
+   chain_file="hg19ToHg38.over.chain"
+else
+   echo "Error: target_build must be hg19 or hg38"
+   exit 1
+fi
 
 # Get input_file without path and without extension
 input_file_no_path=$(basename "$input_file")
@@ -37,7 +49,7 @@ paste ${out_dir}/tmp_c1.txt \
     > ${out_dir}/tmp_in.bed
 
 # Do crossover
-CrossMap bed hg38ToHg19.over.chain \
+CrossMap bed $chain_file \
    ${out_dir}/tmp_in.bed  \
    ${out_dir}/tmp_out.bed
 
@@ -59,11 +71,11 @@ plink2 --bfile ${out_dir}/tmp_gwas \
 
 # Write out final 1.9 format file
 plink2 --pfile ${out_dir}/tmp_gwas_id_sort \
-    --make-bed --out ${out_dir}/${input_file_name}_hg19
+    --make-bed --out ${out_dir}/${input_file_name}_${target_build}
 
 # Report SNP counts
 orig_snp_nr=`wc -l ${input_file}`
-crossover_snp_nr=`wc -l ${out_dir}/${input_file_name}_hg19.bim`
+crossover_snp_nr=`wc -l ${out_dir}/${input_file_name}_${target_build}.bim`
 
 echo "Original SNP nr: $orig_snp_nr"
 echo "Crossovered SNP nr: $crossover_snp_nr"
