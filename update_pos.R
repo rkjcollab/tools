@@ -1,12 +1,16 @@
 #!/usr/bin/env Rscript
 
-args <- commandArgs(trailingOnly=TRUE)
+library(argparse)
 
-print("Script is called by create_initial_input.sh. First trailing ")
-print("arg should be file path to tmp_out.bed created by CrossMap. ")
-print("Second trailing arg should be file path to tmp_gwas.bim with ")
-print("only SNPs successfully crossovered. Writes new tmp_gwas.bim, ")
-print("or equivalent file name that was passed in.")
+parser <- ArgumentParser(
+  description = "Update BIM positions after CrossMap liftOver.")
+
+parser$add_argument(
+  "-c", "--crossmap-bed", help="CrossMap .bed file path (required)", required=TRUE)
+parser$add_argument(
+  "-s", "--success-bim", help="Successfully crossovered .bim file path (required)", required=TRUE)
+
+args <- parser$parse_args()
 
 update_pos <- function(in_bed, in_bim) {
   in.bed <- read.table(in_bed)[,c(2,4)]
@@ -25,4 +29,4 @@ update_pos <- function(in_bed, in_bim) {
               sep="\t", quote=F, row.names=F, col.names=F)
 }
 
-update_pos(args[1], args[2])
+update_pos(args$crossmap_bed, args$success_bim)
