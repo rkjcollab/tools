@@ -1,0 +1,15 @@
+*.bed
+*.bim
+*.fam
+*.log
+*.nosex
+*.pgen
+*.pvar
+*.psam
+*.missnp
+*_common_snps.txt
+*_dupl_pos_snps.txt
+*_dupl_snp_ids.txt
+*_new_snp_ids.txt
+*_strand_amb_variants.txt
+tmp_*
